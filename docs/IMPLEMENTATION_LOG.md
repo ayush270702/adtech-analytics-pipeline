@@ -6,8 +6,8 @@
 - **Working directory:** `D:\\adtech-analytics-pipeline`
 - **Default branch:** `main`
 - **Approach:** Build incrementally. Create folders and files only when a milestone needs them; verify each milestone before proceeding.
-- **Last updated:** 2026-10-31
-- **Current progress:** Phase 1 — Project Foundation; PostgreSQL is running and the project schemas have been created.
+- **Last updated:** 2026-11-05
+- **Current progress:** Phase 1 — Project Foundation; PostgreSQL is running, project schemas and the first two source tables are created and seeded.
 
 ---
 
@@ -34,9 +34,11 @@ Do not mark a step complete until its verification succeeds.
 | 1.4 | Start PostgreSQL container | Complete |
 | 1.5 | Connect to PostgreSQL and verify database | Complete |
 | 1.6 | Create project schemas | Complete |
-| 1.7 | Create source business tables | Not started |
-| 1.8 | Create operational metadata tables | Not started |
-| 1.9 | Verify database structure | Not started |
+| 1.7 | Create source business tables (`clients`, `platforms`) | Complete |
+| 1.8 | Create remaining source tables | Not started |
+| 1.9 | Create operational metadata tables | Not started |
+| 1.10 | Verify database structure | Not started |
+
 
 ---
 
@@ -349,6 +351,85 @@ The project schemas are:
 
 ---
 
+## Step 1.7 — Create the first source business tables
+
+**Completion date:** 2026-11-05
+
+**Purpose:** Create the first two business reference tables in the `source` schema and insert small seed records. These tables establish the clients and advertising platforms that campaigns will reference.
+
+### Create `source.clients`
+
+```sql
+CREATE TABLE source.clients (
+    client_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    client_name VARCHAR(150) NOT NULL,
+    industry VARCHAR(100),
+    country VARCHAR(100),
+    currency_code CHAR(3) NOT NULL DEFAULT 'INR',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Create `source.platforms`
+
+```sql
+CREATE TABLE source.platforms (
+    platform_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    platform_name VARCHAR(50) NOT NULL UNIQUE,
+    platform_type VARCHAR(50) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Column and constraint notes
+
+- `BIGINT GENERATED ALWAYS AS IDENTITY` generates numeric IDs automatically. `PRIMARY KEY` guarantees each row has a unique, non-null identifier.
+- `NOT NULL` marks required fields.
+- `UNIQUE` on `platform_name` prevents duplicate platform names.
+- `CHAR(3)` stores a three-character currency code such as INR.
+- `TIMESTAMPTZ` stores timestamps with time-zone awareness.
+- The `created_at` default records the insert time. `updated_at` currently defaults on insert too; it will not automatically change on updates unless we add application logic or a trigger later.
+
+### Seed the initial records
+
+```sql
+INSERT INTO source.clients
+    (client_name, industry, country, currency_code)
+VALUES
+    ('FreshMart India', 'Retail', 'India', 'INR'),
+    ('TechNova Solutions', 'Technology', 'India', 'INR');
+
+INSERT INTO source.platforms
+    (platform_name, platform_type)
+VALUES
+    ('Meta', 'Social'),
+    ('Google', 'Search'),
+    ('YouTube', 'Video');
+```
+
+### Verification commands
+
+Run in `psql`:
+
+```text
+\\dt source.*
+\\d source.clients
+\\d source.platforms
+```
+
+Then verify the seed records:
+
+```sql
+SELECT * FROM source.clients;
+SELECT * FROM source.platforms;
+```
+
+**Verified result:** The user confirmed both tables and their seed records appeared correctly: 2 client rows and 3 platform rows (Meta, Google, YouTube).
+
+**Modeling note:** YouTube is represented as its own reporting platform/channel in this portfolio model, although it belongs to Google's ecosystem. In a real cross-platform reporting implementation, clarify source/account ownership and attribution to avoid double-counting Google/YouTube performance.
+
 # Useful commands reference
 
 Run these in Windows PowerShell from the repository root unless noted otherwise.
@@ -398,3 +479,4 @@ After the source tables, we will create the operational metadata tables in `ops`
 | Date | Change |
 |---|---|
 | 2026-10-31 | Created the implementation runbook and documented verified environment, Git, Docker Compose, PostgreSQL, and schema setup steps. |
+| 2026-11-05 | Documented and verified the first two source tables and seed records (`source.clients`, `source.platforms`). |
